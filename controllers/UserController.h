@@ -4,15 +4,15 @@
 
 using namespace drogon;
 
-class BookController : public drogon::HttpController<BookController>
+class UserController : public drogon::HttpController<UserController>
 {
 public:
     METHOD_LIST_BEGIN
-    ADD_METHOD_TO(BookController::getAll, "/books",      Get);
-    ADD_METHOD_TO(BookController::getOne, "/books/{id}", Get);
-    ADD_METHOD_TO(BookController::create, "/books",      Post,   "JwtFilter");
-    ADD_METHOD_TO(BookController::update, "/books/{id}", Put,    "JwtFilter");
-    ADD_METHOD_TO(BookController::remove, "/books/{id}", Delete, "JwtFilter");
+    ADD_METHOD_TO(UserController::getAll, "/users",      Get,    "JwtFilter");
+    ADD_METHOD_TO(UserController::getOne, "/users/{id}", Get,    "JwtFilter");
+    ADD_METHOD_TO(UserController::create, "/users",      Post);
+    ADD_METHOD_TO(UserController::update, "/users/{id}", Put,    "JwtFilter");
+    ADD_METHOD_TO(UserController::remove, "/users/{id}", Delete, "JwtFilter");
     METHOD_LIST_END
 
     void getAll(const HttpRequestPtr &req,
@@ -34,9 +34,9 @@ public:
                 int id);
 
 private:
-    // Build a Book from a DB result row
+    // Map a DB row to JSON (password_hash excluded)
     static Json::Value rowToJson(const drogon::orm::Row &row);
 
-    // Build a standard error response
+    // Standard error response
     static HttpResponsePtr errorResp(HttpStatusCode code, const std::string &msg);
 };
