@@ -13,7 +13,7 @@ namespace drogon_model {
 namespace library {
 
 struct User {
-    std::shared_ptr<int32_t>     id;
+    std::shared_ptr<std::string> id;
     std::shared_ptr<std::string> name;
     std::shared_ptr<std::string> email;
     std::shared_ptr<std::string> passwordHash; // never exposed in toJson()

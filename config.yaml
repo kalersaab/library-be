@@ -238,4 +238,5 @@ plugins:
       # custom_time_format: ''
       # use_real_ip: false
 # custom_config: custom configuration for users. This object can be get by the app().getCustomConfig() method. 
-custom_config: {}
+custom_config:
+  JWT_TOKEN_SECRET: "5c0b7e9f4b8d2a1c7e3f6a9b1d4e8f2c9a7d5b3e1f6c8a2d9e4b7c1f3a8d6e2"

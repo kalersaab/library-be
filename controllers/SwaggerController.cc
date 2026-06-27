@@ -178,7 +178,7 @@ void SwaggerController::spec(const HttpRequestPtr &req,
 
     "/users/{id}": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
       ],
       "get": {
         "tags": ["Users"],
@@ -278,7 +278,7 @@ void SwaggerController::spec(const HttpRequestPtr &req,
       "User": {
         "type": "object",
         "properties": {
-          "id":         { "type": "integer", "readOnly": true },
+          "id":         { "type": "string", "format": "uuid", "readOnly": true },
           "name":       { "type": "string"  },
           "email":      { "type": "string", "format": "email" },
           "role":       { "type": "string", "enum": ["admin", "member"] },

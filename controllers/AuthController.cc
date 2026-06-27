@@ -1,14 +1,12 @@
 #include "AuthController.h"
+#include "utils/JwtUtils.h"
 #include <drogon/orm/DbClient.h>
-#include <drogon/utils/Utilities.h>   // getSha256
+#include <drogon/utils/Utilities.h>
 #include <jwt/jwt.hpp>
 #include <chrono>
 
 using namespace drogon;
 using namespace drogon::orm;
-
-static const std::string JWT_SECRET   = "library_secret_change_me";
-static const int         JWT_EXPIRY_H = 24; // token valid for 24 hours
 
 HttpResponsePtr AuthController::errorResp(HttpStatusCode code,
                                            const std::string &msg)
@@ -59,30 +57,30 @@ void AuthController::login(const HttpRequestPtr &req,
             }
 
             const auto &row = r[0];
-            const std::string userId = std::to_string(row["id"].as<int32_t>());
+            const std::string userId = row["id"].as<std::string>();
             const std::string role   = row["role"].as<std::string>();
             const std::string name   = row["name"].as<std::string>();
 
             // ── Build the JWT ─────────────────────────────────────────────
             auto now    = std::chrono::system_clock::now();
-            auto expiry = now + std::chrono::hours(JWT_EXPIRY_H);
+            auto expiry = now + std::chrono::hours(jwt_utils::expiry_hours);
 
             jwt::jwt_object token{
                 jwt::params::algorithm("HS256"),
-                jwt::params::secret(JWT_SECRET),
+                jwt::params::secret(jwt_utils::secret()),
                 jwt::params::payload({
                     {"sub",  userId},
                     {"role", role},
                     {"name", name}
                 })
             };
-            token.add_claim("iat", now);
-            token.add_claim("exp", expiry);
+            token.add_claim(jwt::registered_claims::expiration, expiry);
+            token.add_claim(jwt::registered_claims::issued_at,  now);
 
             Json::Value resp;
             resp["token"]      = token.signature();
-            resp["expires_in"] = JWT_EXPIRY_H * 3600;
-            resp["user"]["id"]    = row["id"].as<int32_t>();
+            resp["expires_in"] = jwt_utils::expiry_hours * 3600;
+            resp["user"]["id"]    = row["id"].as<std::string>();
             resp["user"]["name"]  = name;
             resp["user"]["email"] = row["email"].as<std::string>();
             resp["user"]["role"]  = role;

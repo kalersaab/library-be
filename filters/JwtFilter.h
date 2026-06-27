@@ -3,6 +3,7 @@
 #include <drogon/HttpFilter.h>
 
 using namespace drogon;
+extern std::string JWT_SECRET;
 
 // Validates the Authorization: Bearer <token> header on every request
 // that uses this filter. On success it forwards the request; on failure

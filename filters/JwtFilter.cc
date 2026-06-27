@@ -1,10 +1,7 @@
 #include "JwtFilter.h"
+#include "utils/JwtUtils.h"
 #include <jwt/jwt.hpp>
 #include <drogon/drogon.h>
-
-// Keep the secret in one place – in production load this from an env var
-// or the Drogon custom_config section.
-static const std::string JWT_SECRET = "library_secret_change_me";
 
 void JwtFilter::doFilter(const HttpRequestPtr &req,
                          FilterCallback &&fcb,
@@ -31,8 +28,7 @@ void JwtFilter::doFilter(const HttpRequestPtr &req,
         jwt::jwt_object obj = jwt::decode(
             token,
             jwt::params::algorithms({"HS256"}),
-            jwt::params::secret(JWT_SECRET),
-            jwt::params::verify(true)
+            jwt::params::secret(jwt_utils::secret())
         );
 
         // ── 3. Forward verified claims as request attributes ─────────────
@@ -51,10 +47,18 @@ void JwtFilter::doFilter(const HttpRequestPtr &req,
         resp->setStatusCode(k401Unauthorized);
         fcb(resp);
     }
+    catch (const jwt::SignatureFormatError &)
+    {
+        Json::Value j;
+        j["error"] = "Invalid token signature";
+        auto resp = HttpResponse::newHttpJsonResponse(j);
+        resp->setStatusCode(k401Unauthorized);
+        fcb(resp);
+    }
     catch (const std::exception &e)
     {
         Json::Value j;
-        j["error"] = "Invalid token";
+        j["error"] = std::string("Token error: ") + e.what();
         auto resp = HttpResponse::newHttpJsonResponse(j);
         resp->setStatusCode(k401Unauthorized);
         fcb(resp);

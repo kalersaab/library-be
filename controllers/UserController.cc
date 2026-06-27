@@ -21,7 +21,7 @@ HttpResponsePtr UserController::errorResp(HttpStatusCode code,
 Json::Value UserController::rowToJson(const Row &row)
 {
     Json::Value j;
-    if (!row["id"].isNull())         j["id"]         = row["id"].as<int32_t>();
+    if (!row["id"].isNull())         j["id"]         = row["id"].as<std::string>();
     if (!row["name"].isNull())       j["name"]       = row["name"].as<std::string>();
     if (!row["email"].isNull())      j["email"]       = row["email"].as<std::string>();
     if (!row["role"].isNull())       j["role"]       = row["role"].as<std::string>();
@@ -56,7 +56,7 @@ void UserController::getAll(const HttpRequestPtr &req,
 
 void UserController::getOne(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback,
-                              int id)
+                              std::string id)
 {
     auto db = app().getDbClient();
     db->execSqlAsync(
@@ -133,7 +133,7 @@ void UserController::create(const HttpRequestPtr &req,
 
 void UserController::update(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback,
-                              int id)
+                              std::string id)
 {
     auto jsonBody = req->getJsonObject();
     if (!jsonBody) {
@@ -205,7 +205,7 @@ void UserController::update(const HttpRequestPtr &req,
 
 void UserController::remove(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback,
-                              int id)
+                              std::string id)
 {
     auto db = app().getDbClient();
     db->execSqlAsync(

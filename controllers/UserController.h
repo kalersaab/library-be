@@ -20,23 +20,20 @@ public:
 
     void getOne(const HttpRequestPtr &req,
                 std::function<void(const HttpResponsePtr &)> &&callback,
-                int id);
+                std::string id);
 
     void create(const HttpRequestPtr &req,
                 std::function<void(const HttpResponsePtr &)> &&callback);
 
     void update(const HttpRequestPtr &req,
                 std::function<void(const HttpResponsePtr &)> &&callback,
-                int id);
+                std::string id);
 
     void remove(const HttpRequestPtr &req,
                 std::function<void(const HttpResponsePtr &)> &&callback,
-                int id);
+                std::string id);
 
 private:
-    // Map a DB row to JSON (password_hash excluded)
     static Json::Value rowToJson(const drogon::orm::Row &row);
-
-    // Standard error response
     static HttpResponsePtr errorResp(HttpStatusCode code, const std::string &msg);
 };
