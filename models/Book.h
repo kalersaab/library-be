@@ -3,7 +3,6 @@
 #include <json/json.h>
 #include <string>
 #include <memory>
-#include <stdint.h>
 
 // Lightweight Book DTO used by BookController.
 // If you have a live DB, run:

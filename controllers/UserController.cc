@@ -5,6 +5,28 @@
 using namespace drogon;
 using namespace drogon::orm;
 
+// Valid roles accepted by the API: admin, librarian, member
+const std::set<std::string> UserController::kValidRoles{"admin", "librarian", "member"};
+
+// Helper: returns true (and fires a 403) when caller's role is not in allowedRoles
+static bool denyIfNotRole(const HttpRequestPtr &req,
+                           std::function<void(const HttpResponsePtr &)> &callback,
+                           std::initializer_list<std::string_view> allowedRoles)
+{
+    std::string role;
+    try { role = req->getAttributes()->get<std::string>("jwt_role"); } catch (...) {}
+
+    for (auto r : allowedRoles)
+        if (role == r) return false;
+
+    Json::Value j;
+    j["error"] = "Forbidden: insufficient role";
+    auto resp = HttpResponse::newHttpJsonResponse(j);
+    resp->setStatusCode(k403Forbidden);
+    callback(resp);
+    return true;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 HttpResponsePtr UserController::errorResp(HttpStatusCode code,
@@ -35,6 +57,9 @@ Json::Value UserController::rowToJson(const Row &row)
 void UserController::getAll(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback)
 {
+    // Only admin and librarian may list all users
+    if (denyIfNotRole(req, callback, {"admin", "librarian"})) return;
+
     auto db = app().getDbClient();
     db->execSqlAsync(
         "SELECT id, name, email, role, created_at, updated_at "
@@ -58,6 +83,18 @@ void UserController::getOne(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback,
                               std::string id)
 {
+    // A member may only retrieve their own profile; admin/librarian see any
+    std::string callerRole, callerId;
+    try {
+        callerRole = req->getAttributes()->get<std::string>("jwt_role");
+        callerId   = req->getAttributes()->get<std::string>("jwt_user_id");
+    } catch (...) {}
+
+    if (callerRole == "member" && callerId != id) {
+        callback(errorResp(k403Forbidden, "Forbidden: you can only view your own profile"));
+        return;
+    }
+
     auto db = app().getDbClient();
     db->execSqlAsync(
         "SELECT id, name, email, role, created_at, updated_at "
@@ -100,9 +137,25 @@ void UserController::create(const HttpRequestPtr &req,
     const std::string name     = (*jsonBody)["name"].asString();
     const std::string email    = (*jsonBody)["email"].asString();
     const std::string password = (*jsonBody)["password"].asString();
-    const std::string role     = (jsonBody->isMember("role") && (*jsonBody)["role"].isString())
-                                     ? (*jsonBody)["role"].asString()
-                                     : "member";
+    std::string role = "member";
+    if (jsonBody->isMember("role") && (*jsonBody)["role"].isString()) {
+        role = (*jsonBody)["role"].asString();
+        if (!kValidRoles.count(role)) {
+            callback(errorResp(k400BadRequest,
+                "Invalid role. Allowed values: admin, librarian, member"));
+            return;
+        }
+        // Only allow elevating to admin/librarian if the caller is authenticated as admin
+        if (role != "member") {
+            std::string callerRole;
+            try { callerRole = req->getAttributes()->get<std::string>("jwt_role"); } catch (...) {}
+            if (callerRole != "admin") {
+                callback(errorResp(k403Forbidden,
+                    "Only admins can assign the '" + role + "' role"));
+                return;
+            }
+        }
+    }
 
     // Hash the password before storing
     const std::string hash = drogon::utils::getSha256(password);
@@ -157,6 +210,21 @@ void UserController::update(const HttpRequestPtr &req,
     }
     if (jsonBody->isMember("role") && (*jsonBody)["role"].isString()) {
         role = (*jsonBody)["role"].asString(); hasRole = true;
+        if (!UserController::kValidRoles.count(role)) {
+            callback(errorResp(k400BadRequest,
+                "Invalid role. Allowed values: admin, librarian, member"));
+            return;
+        }
+        // Only admins can elevate to admin or librarian
+        if (role != "member") {
+            std::string callerRole;
+            try { callerRole = req->getAttributes()->get<std::string>("jwt_role"); } catch (...) {}
+            if (callerRole != "admin") {
+                callback(errorResp(k403Forbidden,
+                    "Only admins can assign the '" + role + "' role"));
+                return;
+            }
+        }
         sql += ", role = $" + std::to_string(++paramIdx);
     }
     if (jsonBody->isMember("password") && (*jsonBody)["password"].isString()) {
@@ -207,6 +275,9 @@ void UserController::remove(const HttpRequestPtr &req,
                               std::function<void(const HttpResponsePtr &)> &&callback,
                               std::string id)
 {
+    // Only admins may delete users
+    if (denyIfNotRole(req, callback, {"admin"})) return;
+
     auto db = app().getDbClient();
     db->execSqlAsync(
         "DELETE FROM users WHERE id = $1",

@@ -58,9 +58,10 @@ void SwaggerController::spec(const HttpRequestPtr &req,
     { "url": "http://127.0.0.1:3000", "description": "Local dev server" }
   ],
   "tags": [
-    { "name": "Auth",   "description": "Authentication"             },
-    { "name": "Books",  "description": "Book inventory management" },
-    { "name": "Users",  "description": "User account management"  }
+    { "name": "Auth",    "description": "Authentication"              },
+    { "name": "Books",   "description": "Book inventory management"  },
+    { "name": "Users",   "description": "User account management"   },
+    { "name": "Borrows", "description": "Borrow and return books"    }
   ],
   "paths": {
 
@@ -207,9 +208,90 @@ void SwaggerController::spec(const HttpRequestPtr &req,
         "tags": ["Users"],
         "summary": "Delete a user",
         "operationId": "deleteUser",
+        "security": [{ "bearerAuth": [] }],
         "responses": {
           "204": { "description": "Deleted"    },
           "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/borrows": {
+      "get": {
+        "tags": ["Borrows"],
+        "summary": "List borrow records (admin / librarian)",
+        "operationId": "getBorrows",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "user_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Filter by member UUID" },
+          { "name": "book_id", "in": "query", "schema": { "type": "integer" },                  "description": "Filter by book ID"     },
+          { "name": "status",  "in": "query", "schema": { "type": "string", "enum": ["borrowed","returned"] }, "description": "Filter by status" }
+        ],
+        "responses": {
+          "200": { "description": "Array of borrow records", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Borrow" } } } } },
+          "403": { "description": "Forbidden",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "post": {
+        "tags": ["Borrows"],
+        "summary": "Issue a book to a member (admin / librarian)",
+        "operationId": "borrowBook",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BorrowInput" } } }
+        },
+        "responses": {
+          "201": { "description": "Borrow record created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Borrow" } } } },
+          "400": { "description": "Bad request",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "403": { "description": "Forbidden",    "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "User or book not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Not enough copies available", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/borrows/{id}": {
+      "parameters": [
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+      ],
+      "get": {
+        "tags": ["Borrows"],
+        "summary": "Get a single borrow record",
+        "operationId": "getBorrow",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "OK",        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Borrow" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["Borrows"],
+        "summary": "Hard-delete a borrow record (admin only)",
+        "operationId": "deleteBorrow",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "204": { "description": "Deleted"    },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+
+    "/borrows/{id}/return": {
+      "parameters": [
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+      ],
+      "put": {
+        "tags": ["Borrows"],
+        "summary": "Mark a book as returned (admin / librarian)",
+        "operationId": "returnBook",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Returned",  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Borrow" } } } },
+          "403": { "description": "Forbidden", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "404": { "description": "Not found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "409": { "description": "Already returned", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
         }
       }
     }
@@ -281,7 +363,7 @@ void SwaggerController::spec(const HttpRequestPtr &req,
           "id":         { "type": "string", "format": "uuid", "readOnly": true },
           "name":       { "type": "string"  },
           "email":      { "type": "string", "format": "email" },
-          "role":       { "type": "string", "enum": ["admin", "member"] },
+      "role":       { "type": "string", "enum": ["admin", "librarian", "member"] },
           "created_at": { "type": "string", "format": "date-time", "readOnly": true },
           "updated_at": { "type": "string", "format": "date-time", "readOnly": true }
         }
@@ -294,7 +376,7 @@ void SwaggerController::spec(const HttpRequestPtr &req,
           "name":     { "type": "string" },
           "email":    { "type": "string", "format": "email" },
           "password": { "type": "string", "format": "password" },
-          "role":     { "type": "string", "enum": ["admin", "member"], "default": "member" }
+          "role":     { "type": "string", "enum": ["admin", "librarian", "member"], "default": "member" }
         }
       },
 
@@ -304,7 +386,7 @@ void SwaggerController::spec(const HttpRequestPtr &req,
           "name":     { "type": "string" },
           "email":    { "type": "string", "format": "email" },
           "password": { "type": "string", "format": "password" },
-          "role":     { "type": "string", "enum": ["admin", "member"] }
+          "role":     { "type": "string", "enum": ["admin", "librarian", "member"] }
         }
       },
 
@@ -312,6 +394,38 @@ void SwaggerController::spec(const HttpRequestPtr &req,
         "type": "object",
         "properties": {
           "error": { "type": "string" }
+        }
+      },
+
+      "Borrow": {
+        "type": "object",
+        "properties": {
+          "id":             { "type": "integer", "readOnly": true },
+          "user_id":        { "type": "string", "format": "uuid" },
+          "book_id":        { "type": "integer" },
+          "issued_by":      { "type": "string", "format": "uuid", "description": "UUID of the librarian who issued the book" },
+          "quantity":       { "type": "integer", "default": 1 },
+          "issue_date":     { "type": "string", "format": "date-time", "readOnly": true },
+          "due_date":       { "type": "string", "format": "date-time" },
+          "return_date":    { "type": "string", "format": "date-time", "readOnly": true },
+          "status":         { "type": "string", "enum": ["borrowed", "returned"], "readOnly": true },
+          "member_name":    { "type": "string", "readOnly": true },
+          "book_title":     { "type": "string", "readOnly": true },
+          "librarian_name": { "type": "string", "readOnly": true },
+          "created_at":     { "type": "string", "format": "date-time", "readOnly": true },
+          "updated_at":     { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+
+      "BorrowInput": {
+        "type": "object",
+        "required": ["user_id"],
+        "properties": {
+          "user_id":    { "type": "string", "format": "uuid", "description": "Member UUID receiving the book" },
+          "book_id":    { "type": "integer", "description": "Book ID (use this or book_title)" },
+          "book_title": { "type": "string",  "description": "Book title – case-insensitive lookup (use this or book_id)" },
+          "quantity":   { "type": "integer", "default": 1 },
+          "due_date":   { "type": "string",  "format": "date", "description": "Optional return due date (ISO 8601)" }
         }
       }
     }
